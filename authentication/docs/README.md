@@ -388,3 +388,99 @@ Registration requires a valid OTP. The OTP must be requested first via `POST /v1
 ### Extending the Login Response
 
 To include additional data in the login response, override `LoginSerializer.validate()` and add fields to the returned dictionary.
+
+---
+
+## 9. Role & Permission Authorization System
+
+### Overview
+
+The system includes a production-ready, additive role- and permission-based authorization architecture:
+1. **User**: Extends `PermissionsMixin` and connects to `Role` via `roles` M2M with through-model `UserRole`.
+2. **Role**: Represents an authorization role with stable programmatic `code` (`SUPER_ADMIN`, `ADMIN`, `PROJECT_MANAGER`, `DEVELOPER`, `USER`), human-readable `name`, direct `permissions` (`auth.Permission`), and `groups` (`auth.Group`).
+3. **Effective Permissions**: Automatically computed from 4 sources:
+   - Direct user permissions
+   - Permissions from groups assigned to user
+   - Permissions assigned to user's roles
+   - Permissions from groups assigned to user's roles
+4. **Backend Integration**: `RolePermissionBackend` extends Django's authentication backend so that native `user.has_perm()` and `user.get_all_permissions()` include all role and role-group permissions.
+5. **Automatic Cache Invalidation**: `m2m_changed` and `post_save`/`post_delete` signals automatically invalidate user permission caches whenever permissions, groups, or role assignments change.
+
+### Public Authorization Functions
+
+Import from `core.utils.permissions` or `authentication.services.permissions`:
+
+```python
+from core.utils.permissions import (
+    has_role,
+    has_any_role,
+    has_all_roles,
+    has_permission,
+    has_any_permission,
+    has_all_permissions,
+)
+
+# Role checks
+has_role(user, "SUPER_ADMIN")
+has_any_role(user, ["PROJECT_MANAGER", "DEVELOPER"])
+has_all_roles(user, ["PROJECT_MANAGER", "DEVELOPER"])
+
+# Permission checks (app_label.codename)
+has_permission(user, "projects.view_project")
+has_any_permission(user, ["projects.view_project", "projects.change_project"])
+has_all_permissions(user, ["projects.view_project", "projects.change_project"])
+```
+
+### View Decorator `@authorize`
+
+Import from `core.utils.decorators`:
+
+```python
+from core.utils.decorators import authorize
+
+# Role-only check
+@authorize(strict="SUPER_ADMIN")
+def delete_user(request, user_id):
+    ...
+
+# Permission-only check
+@authorize(permission="projects.view_project")
+def project_list(request):
+    ...
+
+# Combined Role AND Permission check (default operator is AND)
+@authorize(
+    strict="PROJECT_MANAGER",
+    permission="projects.change_project",
+    operator="AND",
+)
+def update_project(request, project_id):
+    ...
+
+# Combined Role OR Permission check
+@authorize(
+    strict="PROJECT_MANAGER",
+    permission="projects.change_project",
+    operator="OR",
+)
+def alternative_update_project(request, project_id):
+    ...
+```
+
+### DRF Permission Classes
+
+Import from `core.utils.permissions`:
+
+```python
+from rest_framework.views import APIView
+from core.utils.permissions import HasRole, HasPermission, AuthorizePermission
+
+class ProjectManagementView(APIView):
+    permission_classes = [
+        AuthorizePermission(
+            roles=["PROJECT_MANAGER"],
+            permissions=["projects.change_project"],
+            operator="AND",
+        )
+    ]
+```

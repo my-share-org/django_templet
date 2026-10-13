@@ -14,9 +14,13 @@ from .configs.celery_schedules import CELERY_BEAT_SCHEDULE
 
 
 # =========================================
-# Default User Model
+# Default User Model & Authentication Backends
 # =========================================
 AUTH_USER_MODEL = 'authentication.User'
+AUTHENTICATION_BACKENDS = [
+    'authentication.backends.RolePermissionBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
 
 # =========================================
 # load CONFIG
