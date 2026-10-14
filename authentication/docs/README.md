@@ -30,15 +30,26 @@ All endpoints return a standardized response envelope (`success`, `message`, `da
 
 ```
 authentication/
-├── migrations/             # Database migration files
+├── admin.py                # Django admin configuration & system role delete protection
+├── apps.py                 # App configuration & signal registration
+├── backends.py             # RolePermissionBackend (unifies roles, groups, & user perms)
 ├── docs/
 │   └── README.md           # This file
-├── admin.py                # Django admin configuration
-├── apps.py                 # App configuration
-├── managers.py             # Custom user manager
-├── models.py               # User model
+├── management/
+│   └── commands/
+│       └── sync_roles.py   # System roles CLI synchronization & migration generator
+├── managers/
+│   └── user.py             # Custom UserManager
+├── migrations/             # Database migration files
+├── models.py               # User, Role, and UserRole models
+├── roles.py                # System role re-exports
 ├── serializers.py          # DRF serializers
-├── services.py             # Business logic (password change)
+├── services/
+│   ├── password.py         # Password management services
+│   ├── permissions.py      # Core authorization & effective permission calculations
+│   └── roles.py            # System role synchronization service
+├── signals.py              # User permission cache invalidation signals
+├── system_roles.py         # Single source of truth for canonical system roles
 ├── throttles.py            # Custom rate limiters
 ├── urls.py                 # URL patterns
 └── views.py                # API views
@@ -485,7 +496,33 @@ class ProjectManagementView(APIView):
     ]
 ```
 
+### Object-Level Authorization & Ownership Protection
+
+For record-level checks, use `check_object_permission(user, permission, obj, allow_owner=False)` or pass `object_getter` to `@authorize`:
+
+```python
+from core.utils.permissions import check_object_permission
+
+# Standard object check (ownership does NOT bypass permission by default)
+has_access = check_object_permission(user, "projects.change_project", project)
+
+# Explicitly permit owner access (e.g., self-service profile edits)
+has_access = check_object_permission(user, "accounts.view_profile", profile, allow_owner=True)
+```
+
+With `@authorize`:
+```python
+@authorize(
+    permission="projects.change_project",
+    object_getter=lambda req, project_id: Project.objects.get(pk=project_id),
+    allow_owner=True,
+)
+def edit_project(request, project_id):
+    ...
+```
+
 ### System Roles Definition & Synchronization Workflow
+
 
 The canonical single source of truth for all system roles is [`authentication/system_roles.py`](../system_roles.py).
 

@@ -85,10 +85,12 @@ def authorize(
     role_operator: str = "ALL",
     permission_operator: str = "ALL",
     object_getter: Optional[Callable[..., Any]] = None,
+    allow_owner: bool = False,
 ):
     """
     Production-ready decorator for views (function-based or class-based methods).
     Enforces role and/or permission authorization policies with AND/OR composition.
+
 
     Usage:
         @authorize(strict="SUPER_ADMIN")
@@ -151,7 +153,8 @@ def authorize(
     clean_perm_op = permission_operator.strip().upper() if isinstance(permission_operator, str) else "ALL"
 
     def decorator(view_func: Callable):
-        def _check_auth(request, *view_args, **view_kwargs):
+        def _check_auth(*view_args, **view_kwargs):
+            request = _extract_request(view_args, view_kwargs)
             if not request or not getattr(request, "user", None):
                 return False, error_response(
                     message="Authentication required.",
@@ -181,7 +184,15 @@ def authorize(
                 target_obj = None
                 if object_getter is not None:
                     try:
-                        target_obj = object_getter(request, *view_args, **view_kwargs)
+                        target_obj = object_getter(*view_args, **view_kwargs)
+                    except TypeError:
+                        try:
+                            target_obj = object_getter(request, *view_args, **view_kwargs)
+                        except Exception:
+                            return False, error_response(
+                                message="You do not have permission to perform this action.",
+                                status_code=status.HTTP_403_FORBIDDEN,
+                            )
                     except Exception:
                         return False, error_response(
                             message="You do not have permission to perform this action.",
@@ -192,13 +203,25 @@ def authorize(
 
                 if len(perm_specs) == 1 and clean_perm_op != "ANY":
                     if target_obj is not None:
-                        perm_passed = check_object_permission(user, perm_specs[0], target_obj)
+                        perm_passed = check_object_permission(user, perm_specs[0], target_obj, allow_owner=allow_owner)
                     else:
                         perm_passed = has_permission(user, perm_specs[0])
                 elif clean_perm_op == "ANY":
-                    perm_passed = has_any_permission(user, perm_specs, obj=target_obj)
+                    if target_obj is not None:
+                        perm_passed = any(
+                            check_object_permission(user, p, target_obj, allow_owner=allow_owner)
+                            for p in perm_specs
+                        )
+                    else:
+                        perm_passed = has_any_permission(user, perm_specs, obj=target_obj)
                 else:
-                    perm_passed = has_all_permissions(user, perm_specs, obj=target_obj)
+                    if target_obj is not None:
+                        perm_passed = all(
+                            check_object_permission(user, p, target_obj, allow_owner=allow_owner)
+                            for p in perm_specs
+                        )
+                    else:
+                        perm_passed = has_all_permissions(user, perm_specs, obj=target_obj)
 
             # Combine policies with operator
             if role_passed is not None and perm_passed is not None:
@@ -226,9 +249,8 @@ def authorize(
 
             @wraps(view_func)
             async def async_wrapper(*args, **kwargs):
-                request = _extract_request(args, kwargs)
                 passed, error_resp = await sync_to_async(_check_auth, thread_sensitive=True)(
-                    request, *args, **kwargs
+                    *args, **kwargs
                 )
                 if not passed:
                     return error_resp
@@ -237,11 +259,11 @@ def authorize(
         else:
             @wraps(view_func)
             def sync_wrapper(*args, **kwargs):
-                request = _extract_request(args, kwargs)
-                passed, error_resp = _check_auth(request, *args, **kwargs)
+                passed, error_resp = _check_auth(*args, **kwargs)
                 if not passed:
                     return error_resp
                 return view_func(*args, **kwargs)
             return sync_wrapper
+
 
     return decorator

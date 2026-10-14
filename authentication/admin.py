@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 from authentication.models import Role, User, UserRole
@@ -25,6 +25,26 @@ class RoleAdmin(admin.ModelAdmin):
         if obj and obj.is_system:
             readonly.extend(["code", "is_system"])
         return readonly
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.is_system:
+            return False
+        if request is None:
+            return True
+        return super().has_delete_permission(request, obj)
+
+
+    def delete_queryset(self, request, queryset):
+        non_system = queryset.filter(is_system=False)
+        skipped = queryset.filter(is_system=True).count()
+        if skipped > 0:
+            self.message_user(
+                request,
+                f"Skipped {skipped} system-defined role(s). System roles cannot be deleted.",
+                level=messages.WARNING,
+            )
+        non_system.delete()
+
 
 
 @admin.register(User)

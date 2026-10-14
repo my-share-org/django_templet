@@ -103,6 +103,37 @@ class TestRoleAndUserRoleModels:
         with pytest.raises((IntegrityError, ValidationError)):
             UserRole.objects.create(user=test_user, role=role)
 
+    def test_system_role_cannot_be_soft_deleted(self):
+        system_role = Role.objects.get(code=SystemRole.SUPER_ADMIN)
+        with pytest.raises(ValidationError, match="System-defined roles cannot be soft-deleted"):
+            system_role.soft_delete()
+
+    def test_role_save_normalizes_code_without_clean(self):
+        role = Role.objects.create(code="analyst_code", name="Analyst")
+        assert role.code == "ANALYST_CODE"
+
+    def test_role_save_blocks_system_role_code_mutation(self):
+        system_role = Role.objects.get(code=SystemRole.SUPER_ADMIN)
+        system_role.code = "CHANGED_CODE"
+        with pytest.raises(ValidationError, match="System role code cannot be modified"):
+            system_role.save()
+
+    def test_soft_deleted_user_role_reassignment_restores_cleanly(self, test_user):
+        role = Role.objects.get(code=SystemRole.DEVELOPER)
+        ur = assign_role(test_user, role)
+        assert ur.deleted_at is None
+
+        # Soft delete the assignment
+        ur.soft_delete()
+        assert ur.deleted_at is not None
+        assert UserRole.objects.filter(user=test_user, role=role).count() == 0
+
+        # Re-assigning should restore the soft-deleted row without IntegrityError
+        ur_reassigned = assign_role(test_user, role)
+        assert ur_reassigned.pk == ur.pk
+        assert ur_reassigned.deleted_at is None
+        assert UserRole.objects.filter(user=test_user, role=role).count() == 1
+
     def test_soft_delete_and_restore_role(self, test_user):
         role = Role.objects.create(code="TEMP_ROLE", name="Temporary Role")
         assign_role(test_user, role)
@@ -120,6 +151,7 @@ class TestRoleAndUserRoleModels:
         clear_permission_cache(test_user)
 
         assert has_role(test_user, "TEMP_ROLE") is True
+
 
 
 @pytest.mark.unit
@@ -299,13 +331,34 @@ class TestObjectLevelAuthorization:
         def __init__(self, user_id):
             self.user_id = user_id
 
-    def test_check_object_permission_ownership(self, test_user, user_factory):
+    class MockProjectWithHook:
+        def __init__(self, user_id):
+            self.user_id = user_id
+
+        def has_object_permission(self, user, permission):
+            return permission == "projects.custom_action" and self.user_id == user.id
+
+    def test_check_object_permission_ownership_requires_explicit_flag(self, test_user, user_factory):
         other_user = user_factory()
         own_project = self.MockProject(user_id=test_user.id)
         other_project = self.MockProject(user_id=other_user.id)
 
-        assert check_object_permission(test_user, "projects.change_project", own_project) is True
-        assert check_object_permission(test_user, "projects.change_project", other_project) is False
+        # Default (allow_owner=False) ensures ownership does NOT grant arbitrary permission
+        assert check_object_permission(test_user, "projects.change_project", own_project, allow_owner=False) is False
+        assert check_object_permission(test_user, "projects.change_project", other_project, allow_owner=False) is False
+
+        # When allow_owner=True is explicitly passed, own object is authorized
+        assert check_object_permission(test_user, "projects.change_project", own_project, allow_owner=True) is True
+        assert check_object_permission(test_user, "projects.change_project", other_project, allow_owner=True) is False
+
+    def test_check_object_permission_custom_model_hook(self, test_user, user_factory):
+        other_user = user_factory()
+        project = self.MockProjectWithHook(user_id=test_user.id)
+
+        assert check_object_permission(test_user, "projects.custom_action", project) is True
+        assert check_object_permission(other_user, "projects.custom_action", project) is False
+        assert check_object_permission(test_user, "projects.disallowed_action", project) is False
+
 
 
 @pytest.mark.unit
@@ -381,4 +434,52 @@ class TestSystemRolesSync:
         call_command("sync_roles", stdout=out)
         output = out.getvalue()
         assert "synchronization" in output.lower() or "up to date" in output.lower()
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+class TestRoleAdminProtection:
+    def test_admin_has_delete_permission_blocks_system_roles(self, superuser):
+        from django.contrib.admin.sites import AdminSite
+        from django.test import RequestFactory
+        from authentication.admin import RoleAdmin
+        from authentication.models import Role
+
+        admin_site = AdminSite()
+        role_admin = RoleAdmin(Role, admin_site)
+        factory = RequestFactory()
+        request = factory.get("/admin/")
+        request.user = superuser
+
+        system_role = Role.objects.get(code=SystemRole.SUPER_ADMIN)
+        custom_role = Role.objects.create(code="CUSTOM_ROLE", name="Custom")
+
+        assert role_admin.has_delete_permission(request, obj=system_role) is False
+        assert role_admin.has_delete_permission(request, obj=custom_role) is True
+
+
+    def test_admin_delete_queryset_skips_system_roles(self):
+        from django.contrib.admin.sites import AdminSite
+        from django.test import RequestFactory
+        from authentication.admin import RoleAdmin
+        from authentication.models import Role
+
+        admin_site = AdminSite()
+        role_admin = RoleAdmin(Role, admin_site)
+        factory = RequestFactory()
+        request = factory.get("/admin/")
+
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        setattr(request, "session", {})
+        setattr(request, "_messages", FallbackStorage(request))
+
+        custom_role = Role.objects.create(code="TO_DELETE", name="To Delete")
+        system_role = Role.objects.get(code=SystemRole.SUPER_ADMIN)
+
+        qs = Role.objects.filter(pk__in=[custom_role.pk, system_role.pk])
+        role_admin.delete_queryset(request, qs)
+
+        assert not Role.objects.filter(pk=custom_role.pk).exists()
+        assert Role.objects.filter(pk=system_role.pk).exists()
+
 

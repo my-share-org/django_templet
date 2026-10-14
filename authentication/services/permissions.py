@@ -89,6 +89,9 @@ def get_user_effective_permissions(user: Any) -> Set[str]:
     if user is None or not getattr(user, "is_authenticated", False) or not getattr(user, "is_active", False):
         return set()
 
+    if hasattr(user, "_role_perm_cache"):
+        return user._role_perm_cache
+
     if not hasattr(user, "_cached_effective_permissions"):
         # 1. Direct user permissions
         user_perms = set(
@@ -123,11 +126,12 @@ def get_user_effective_permissions(user: Any) -> Set[str]:
         )
 
         combined = user_perms | user_group_perms | role_direct_perms | role_group_perms
-        user._cached_effective_permissions = {
-            f"{app}.{code}" for app, code in combined
-        }
+        perms_set = {f"{app}.{code}" for app, code in combined}
+        user._cached_effective_permissions = perms_set
+        user._role_perm_cache = perms_set
 
     return user._cached_effective_permissions
+
 
 
 # =========================================================================
@@ -286,19 +290,19 @@ def has_all_permissions(user: Any, permissions: Iterable[Union[str, Permission]]
 def assign_role(user: Any, role: Union[str, Role]) -> UserRole:
     """
     Assigns a role to a user and clears relevant permission caches.
+    Safely handles re-assignment of soft-deleted roles without IntegrityError.
     """
     if isinstance(role, str):
         role_obj = Role.objects.get(code=role.strip().upper(), deleted_at__isnull=True)
     else:
         role_obj = role
 
-    user_role, created = UserRole.objects.get_or_create(
-        user=user,
-        role=role_obj,
-        defaults={"deleted_at": None},
-    )
-    if not created and user_role.deleted_at is not None:
-        user_role.restore()
+    user_role = UserRole.all_objects.filter(user=user, role=role_obj).first()
+    if user_role:
+        if user_role.deleted_at is not None:
+            user_role.restore()
+    else:
+        user_role = UserRole.objects.create(user=user, role=role_obj)
 
     clear_permission_cache(user)
     return user_role
@@ -320,10 +324,11 @@ def remove_role(user: Any, role: Union[str, Role]) -> bool:
 
 def assign_permission_to_role(role: Role, permission: Union[str, Permission]) -> Permission:
     """
-    Adds a permission to a role and invalidates caches for all users with that role.
+    Adds a permission to a role.
     """
     if isinstance(permission, str):
-        app_label, codename = permission.strip().split(".", 1)
+        clean_perm = _normalize_permission_code(permission)
+        app_label, codename = clean_perm.split(".", 1)
         perm_obj = Permission.objects.get(
             content_type__app_label=app_label, codename=codename
         )
@@ -331,18 +336,16 @@ def assign_permission_to_role(role: Role, permission: Union[str, Permission]) ->
         perm_obj = permission
 
     role.permissions.add(perm_obj)
-    # Invalidate cache for users holding this role
-    for u in role.users.all():
-        clear_permission_cache(u)
     return perm_obj
 
 
 def remove_permission_from_role(role: Role, permission: Union[str, Permission]) -> bool:
     """
-    Removes a permission from a role and invalidates caches for users holding that role.
+    Removes a permission from a role.
     """
     if isinstance(permission, str):
-        app_label, codename = permission.strip().split(".", 1)
+        clean_perm = _normalize_permission_code(permission)
+        app_label, codename = clean_perm.split(".", 1)
         perm_obj = Permission.objects.get(
             content_type__app_label=app_label, codename=codename
         )
@@ -350,24 +353,19 @@ def remove_permission_from_role(role: Role, permission: Union[str, Permission]) 
         perm_obj = permission
 
     role.permissions.remove(perm_obj)
-    for u in role.users.all():
-        clear_permission_cache(u)
     return True
 
 
 def assign_group_to_role(role: Role, group: Group) -> None:
     """
-    Assigns a permission group to a role and invalidates user caches.
+    Assigns a permission group to a role.
     """
     role.groups.add(group)
-    for u in role.users.all():
-        clear_permission_cache(u)
 
 
 def remove_group_from_role(role: Role, group: Group) -> None:
     """
-    Removes a permission group from a role and invalidates user caches.
+    Removes a permission group from a role.
     """
     role.groups.remove(group)
-    for u in role.users.all():
-        clear_permission_cache(u)
+

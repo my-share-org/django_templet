@@ -7,8 +7,8 @@ from django.contrib.auth.models import Permission
 from django.db import transaction
 
 from authentication.models import Role, UserRole
-from authentication.services.permissions import clear_permission_cache
 from authentication.system_roles import SYSTEM_ROLES, RoleDefinition
+
 
 
 def sync_system_roles(
@@ -81,9 +81,6 @@ def sync_system_roles(
                 if needs_save or perms_changed:
                     if not dry_run:
                         role.save()
-                        # Invalidate cache for users holding this role
-                        for u in role.users.all():
-                            clear_permission_cache(u)
                     summary["updated"].append(code)
                 else:
                     summary["unchanged"].append(code)
@@ -100,9 +97,10 @@ def sync_system_roles(
                 if active_assignments > 0:
                     # Protect role with active users — soft delete instead of hard delete
                     if not dry_run:
+                        # Obsolete system roles with users are un-flagged from system status and soft-deleted
+                        obsolete_role.is_system = False
+                        obsolete_role.save(update_fields=["is_system"])
                         obsolete_role.soft_delete()
-                        for u in obsolete_role.users.all():
-                            clear_permission_cache(u)
                     summary["protected_from_prune"].append(
                         f"{obsolete_role.code} (soft-deleted, {active_assignments} active user assignment(s))"
                     )
@@ -124,18 +122,33 @@ def sync_system_roles(
 
 
 def _sync_role_permissions(role: Role, permission_codes: tuple) -> bool:
-    """Attaches default permissions to a role if not already present."""
+    """Attaches default permissions to a role if not already present using batched queries."""
     if not permission_codes:
         return False
 
-    changed = False
+    from django.db.models import Q
+
+    q_objects = Q()
+    has_valid_specs = False
     for perm_str in permission_codes:
         if "." in perm_str:
-            app_label, codename = perm_str.split(".", 1)
-            perm_obj = Permission.objects.filter(
-                content_type__app_label=app_label, codename=codename
-            ).first()
-            if perm_obj and not role.permissions.filter(pk=perm_obj.pk).exists():
-                role.permissions.add(perm_obj)
-                changed = True
-    return changed
+            app_label, codename = perm_str.strip().split(".", 1)
+            q_objects |= Q(content_type__app_label=app_label, codename=codename)
+            has_valid_specs = True
+
+    if not has_valid_specs:
+        return False
+
+    perm_objs = list(Permission.objects.filter(q_objects))
+    if not perm_objs:
+        return False
+
+    existing_ids = set(role.permissions.values_list("id", flat=True))
+    missing_perms = [p for p in perm_objs if p.id not in existing_ids]
+
+    if missing_perms:
+        role.permissions.add(*missing_perms)
+        return True
+
+    return False
+

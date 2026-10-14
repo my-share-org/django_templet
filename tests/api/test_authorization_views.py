@@ -271,3 +271,54 @@ class TestDRFPermissionClassesIntegration:
         force_authenticate(request2, user=test_user)
         assert view(request2).status_code == status.HTTP_200_OK
 
+
+@pytest.mark.api
+@pytest.mark.django_db
+class TestAuthorizeDecoratorObjectLevel:
+    def setup_method(self):
+        self.factory = APIRequestFactory()
+
+    class MockResource:
+        def __init__(self, resource_id, user_id):
+            self.id = resource_id
+            self.user_id = user_id
+
+    def test_authorize_with_object_getter_and_allow_owner(self, test_user, user_factory):
+        other_user = user_factory()
+        own_resource = self.MockResource(1, test_user.id)
+        other_resource = self.MockResource(2, other_user.id)
+
+        resources = {1: own_resource, 2: other_resource}
+
+        # 1. View with allow_owner=False (default) blocks non-privileged users even if they own the resource
+        @authorize(
+            permission="projects.change_project",
+            object_getter=lambda req, resource_id: resources.get(resource_id),
+            allow_owner=False,
+        )
+        def update_resource(request, resource_id):
+            return success_response(data={"updated": resource_id})
+
+        request_own = self.factory.post("/resources/1/")
+        request_own.user = test_user
+        res_denied = update_resource(request_own, resource_id=1)
+        assert res_denied.status_code == status.HTTP_403_FORBIDDEN
+
+        # 2. View with allow_owner=True allows owner access
+        @authorize(
+            permission="projects.change_project",
+            object_getter=lambda req, resource_id: resources.get(resource_id),
+            allow_owner=True,
+        )
+        def owner_update_resource(request, resource_id):
+            return success_response(data={"updated": resource_id})
+
+        res_owner_allowed = owner_update_resource(request_own, resource_id=1)
+        assert res_owner_allowed.status_code == status.HTTP_200_OK
+
+        request_other = self.factory.post("/resources/2/")
+        request_other.user = test_user
+        res_other_denied = owner_update_resource(request_other, resource_id=2)
+        assert res_other_denied.status_code == status.HTTP_403_FORBIDDEN
+
+

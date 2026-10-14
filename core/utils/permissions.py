@@ -40,12 +40,15 @@ def check_object_permission(
     user: Any,
     permission: str,
     obj: Any,
+    allow_owner: bool = False,
     backend: Optional[Any] = None,
 ) -> bool:
     """
     Evaluates object-level authorization for a specific record.
-    If the object has an `is_accessible_by(user)` or similar check, it is evaluated.
-    Otherwise checks user.has_perm(permission, obj).
+    1. Superusers automatically pass.
+    2. Model-level has_object_permission(user, permission) hook is evaluated if present.
+    3. If allow_owner=True, verifies if user matches obj.user or obj.user_id.
+    4. Otherwise checks standard Django user.has_perm(permission, obj).
     """
     if user is None or not getattr(user, "is_authenticated", False) or not getattr(user, "is_active", False):
         return False
@@ -56,14 +59,16 @@ def check_object_permission(
     if hasattr(obj, "has_object_permission"):
         return bool(obj.has_object_permission(user, permission))
 
-    # 2. Standard ownership / user-field check on object
-    if hasattr(obj, "user_id") and getattr(obj, "user_id") == getattr(user, "id", None):
-        return True
-    if hasattr(obj, "user") and getattr(obj, "user") == user:
-        return True
+    # 2. Explicit ownership check (only when explicitly enabled via allow_owner=True)
+    if allow_owner:
+        if hasattr(obj, "user_id") and getattr(obj, "user_id") == getattr(user, "id", None):
+            return True
+        if hasattr(obj, "user") and getattr(obj, "user") == user:
+            return True
 
     # 3. Standard Django has_perm with obj
     return user.has_perm(permission, obj)
+
 
 
 class HasRole(BasePermission):

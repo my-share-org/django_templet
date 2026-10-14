@@ -64,6 +64,24 @@ class Role(BaseModel):
             if original and original.is_system and original.code != self.code:
                 raise ValidationError({"code": "System role code cannot be modified."})
 
+    def save(self, *args, **kwargs):
+        if self.code:
+            self.code = self.code.strip().upper()
+            if not re.match(r"^[A-Z0-9_]+$", self.code):
+                raise ValidationError({
+                    "code": "Role code must only contain uppercase letters, numbers, and underscores."
+                })
+        if self.pk:
+            original = Role.all_objects.filter(pk=self.pk).first()
+            if original and original.is_system and original.code != self.code:
+                raise ValidationError({"code": "System role code cannot be modified."})
+        super().save(*args, **kwargs)
+
+    def soft_delete(self):
+        if self.is_system:
+            raise ValidationError("System-defined roles cannot be soft-deleted.")
+        super().soft_delete()
+
     def delete(self, using=None, keep_parents=False):
         if self.is_system:
             raise ValidationError("System-defined roles cannot be deleted.")
@@ -95,9 +113,7 @@ class UserRole(BaseModel):
         constraints = [
             models.UniqueConstraint(fields=["user", "role"], name="unique_user_role")
         ]
-        indexes = [
-            models.Index(fields=["user", "role"]),
-        ]
+
 
     def __str__(self):
         return f"{self.user} -> {self.role.code}"

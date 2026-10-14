@@ -65,17 +65,21 @@ class RolePermissionBackend(ModelBackend):
         if not user_obj.is_authenticated or not user_obj.is_active:
             return set()
 
+        if hasattr(user_obj, "_cached_effective_permissions"):
+            return user_obj._cached_effective_permissions
+
         if not hasattr(user_obj, "_role_perm_cache"):
             user_perms = self.get_user_permissions(user_obj, obj)
             group_perms = self.get_group_permissions(user_obj, obj)
             role_perms = self.get_role_permissions(user_obj, obj)
             role_group_perms = self.get_role_group_permissions(user_obj, obj)
 
-            user_obj._role_perm_cache = (
-                user_perms | group_perms | role_perms | role_group_perms
-            )
+            combined = user_perms | group_perms | role_perms | role_group_perms
+            user_obj._role_perm_cache = combined
+            user_obj._cached_effective_permissions = combined
 
         return user_obj._role_perm_cache
+
 
     def has_perm(self, user_obj, perm, obj=None) -> bool:
         if not user_obj.is_authenticated or not user_obj.is_active:

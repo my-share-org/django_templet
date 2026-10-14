@@ -19,10 +19,12 @@ def invalidate_user_role_cache(sender, instance, **kwargs):
 
 @receiver([post_save, post_delete], sender=Role)
 def invalidate_role_cache(sender, instance, **kwargs):
-    """Invalidates cache for all users holding a role when that role is updated."""
-    if instance and instance.pk:
-        for u in instance.users.all():
-            clear_permission_cache(u)
+    """
+    Hook for role-level updates.
+    Note: Multi-user role cache invalidation should rely on request-scoped lifecycles
+    or a global role version key (O(1)) rather than synchronously looping millions of users.
+    """
+    pass
 
 
 @receiver(m2m_changed, sender=User.user_permissions.through)
@@ -41,15 +43,12 @@ def invalidate_user_groups_m2m(sender, instance, **kwargs):
 
 @receiver(m2m_changed, sender=Role.permissions.through)
 def invalidate_role_permissions_m2m(sender, instance, **kwargs):
-    """Invalidates cache for users when role permissions change."""
-    if isinstance(instance, Role):
-        for u in instance.users.all():
-            clear_permission_cache(u)
+    """Hook for role-permission relation changes."""
+    pass
 
 
 @receiver(m2m_changed, sender=Role.groups.through)
 def invalidate_role_groups_m2m(sender, instance, **kwargs):
-    """Invalidates cache for users when role groups change."""
-    if isinstance(instance, Role):
-        for u in instance.users.all():
-            clear_permission_cache(u)
+    """Hook for role-group relation changes."""
+    pass
+
