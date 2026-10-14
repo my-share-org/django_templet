@@ -125,6 +125,55 @@ Single optimised query via `.filter().exists()`. No model instance is loaded.
 
 ---
 
+#### `@authorize` (decorator)
+**Takes:**
+- `strict` or `role`/`roles`: role code string or list of role codes
+- `permission` or `permissions`: permission code string (`"app.codename"`) or list of permissions
+- `operator`: `"AND"` (default) or `"OR"` (composition between role check and permission check)
+- `role_operator`: `"ALL"` (default) or `"ANY"` (when multiple roles provided)
+- `permission_operator`: `"ALL"` (default) or `"ANY"` (when multiple permissions provided)
+- `object_getter`: optional callable `(request, *args, **kwargs) -> obj` for object-level check
+
+**Use on:** function-based views, class-based view handler methods (`get`, `post`, etc.), or async view functions.  
+**Behaviour:** returns standardized 401 error if unauthenticated, 403 if unauthorized. Genuinely async-safe (uses `sync_to_async`).
+
+```python
+@authorize(strict="SUPER_ADMIN")
+def delete_user(request, user_id): ...
+
+@authorize(permission="projects.view_project")
+def project_list(request): ...
+
+@authorize(strict="PROJECT_MANAGER", permission="projects.change_project", operator="AND")
+def update_project(request, project_id): ...
+```
+
+---
+
+### `utils/permissions.py`
+
+#### `HasRole(*roles, require_all=False)` (DRF permission class)
+**Use on:** `permission_classes = [HasRole("SUPER_ADMIN")]`
+
+---
+
+#### `HasPermission(*permissions, require_all=True)` (DRF permission class)
+**Use on:** `permission_classes = [HasPermission("projects.view_project")]`
+
+---
+
+#### `AuthorizePermission(roles=None, permissions=None, operator="AND")` (DRF permission class)
+**Use on:** `permission_classes = [AuthorizePermission(roles=["ADMIN"], permissions=["projects.view_project"], operator="OR")]`
+
+---
+
+#### `check_object_permission(user, permission, obj)`
+**Takes:** user instance, permission string, target model instance  
+**Returns:** `bool` — checks object-level ownership or custom `has_object_permission` hook.
+
+
+---
+
 ### `utils/health_response.py`
 
 #### `health_ok_response(name, message)`

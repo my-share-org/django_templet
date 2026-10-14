@@ -306,3 +306,79 @@ class TestObjectLevelAuthorization:
 
         assert check_object_permission(test_user, "projects.change_project", own_project) is True
         assert check_object_permission(test_user, "projects.change_project", other_project) is False
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+class TestSystemRolesSync:
+    def test_sync_system_roles_creates_new_roles(self):
+        from authentication.services.roles import sync_system_roles
+        from authentication.system_roles import RoleDefinition
+
+        custom_def = [
+            RoleDefinition(code="AUDITOR", name="Compliance Auditor", description="Audit logs access.")
+        ]
+        summary = sync_system_roles(role_definitions=custom_def)
+        assert "AUDITOR" in summary["created"]
+
+        role = Role.objects.get(code="AUDITOR")
+        assert role.name == "Compliance Auditor"
+        assert role.is_system is True
+
+    def test_sync_system_roles_updates_existing_role(self):
+        from authentication.services.roles import sync_system_roles
+        from authentication.system_roles import RoleDefinition
+
+        Role.objects.create(code="ANALYST", name="Old Name", description="Old Desc", is_system=True)
+
+        updated_def = [
+            RoleDefinition(code="ANALYST", name="New Analyst", description="Updated description.")
+        ]
+        summary = sync_system_roles(role_definitions=updated_def)
+        assert "ANALYST" in summary["updated"]
+
+        role = Role.objects.get(code="ANALYST")
+        assert role.name == "New Analyst"
+        assert role.description == "Updated description."
+
+    def test_sync_system_roles_dry_run_leaves_db_unchanged(self):
+        from authentication.services.roles import sync_system_roles
+        from authentication.system_roles import RoleDefinition
+
+        custom_def = [
+            RoleDefinition(code="GHOST_ROLE", name="Ghost", description="Should not be created.")
+        ]
+        summary = sync_system_roles(role_definitions=custom_def, dry_run=True)
+        assert "GHOST_ROLE" in summary["created"]
+        assert not Role.objects.filter(code="GHOST_ROLE").exists()
+
+    def test_sync_system_roles_prune_safety_with_active_user(self, test_user):
+        from authentication.services.roles import sync_system_roles
+        from authentication.system_roles import RoleDefinition
+
+        # Role exists in DB with an assigned user, but is omitted from definitions
+        obsolete_role = Role.objects.create(
+            code="LEGACY_OPERATOR", name="Legacy", description="Legacy role.", is_system=True
+        )
+        assign_role(test_user, obsolete_role)
+
+        definitions = [
+            RoleDefinition(code=SystemRole.USER, name="Standard User", description="Standard user.")
+        ]
+
+        # Prune run
+        summary = sync_system_roles(prune=True, role_definitions=definitions)
+        # Should be protected from hard-delete because of active user assignment
+        assert any("LEGACY_OPERATOR" in item for item in summary["protected_from_prune"])
+        obsolete_role.refresh_from_db()
+        assert obsolete_role.is_deleted is True  # soft-deleted safely
+
+    def test_management_command_sync_roles_executes_cleanly(self):
+        import io
+        from django.core.management import call_command
+
+        out = io.StringIO()
+        call_command("sync_roles", stdout=out)
+        output = out.getvalue()
+        assert "synchronization" in output.lower() or "up to date" in output.lower()
+

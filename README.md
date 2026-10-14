@@ -22,6 +22,7 @@ A production-ready Django REST API backend with authentication, OTP verification
 ## Features
 
 - **JWT Authentication** — Register, login, logout, token refresh/verify, password change, OTP-gated password reset
+- **Role & Permission Authorization** — Database roles, many-to-many user assignments, additive effective permissions across 4 tiers, `@authorize` view decorator (FBV, CBV, Async), DRF permission classes (`HasRole`, `HasPermission`, `AuthorizePermission`), object-level checks, and automated `sync_roles` command based on canonical `authentication/system_roles.py` definitions
 - **OTP System** — Redis-backed, SHA-256 hashed, single-use, configurable TTL and length. Email channel implemented; SMS channel ready for integration
 - **Async Email** — Celery task with auto-retry on SMTP failure (3 retries, exponential backoff)
 - **In-app Notifications** — Create, list (paginated), mark read, mark all read, unread count
@@ -37,8 +38,9 @@ A production-ready Django REST API backend with authentication, OTP verification
 ## Project Structure
 
 ```
-├── authentication/       # User model, JWT auth, password flows
+├── authentication/       # User model, Role & UserRole models, JWT auth, system_roles.py, sync_roles command
 ├── otp/                  # OTP generation, verification, delivery rules
+
 ├── emails/               # Email tasks, logs, OTP email service
 ├── notifications/        # In-app notification model, service, API
 ├── logs/                 # Structured system log model and middleware
@@ -98,6 +100,7 @@ source venv/bin/activate  # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 
 python manage.py migrate
+python manage.py sync_roles
 python manage.py runserver
 
 # In separate terminals:

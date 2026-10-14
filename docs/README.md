@@ -371,6 +371,109 @@ Sensitive endpoints are rate-limited to prevent abuse. Throttle limits are confi
 
 ---
 
+### Role & Permission Authorization System
+
+The project implements a production-ready, additive role- and permission-based authorization architecture.
+
+#### 1. Models & Relationships
+- **`Role`** — Represents a system or custom role. Contains:
+  - `code`: Unique, uppercase programmatic code (e.g., `SUPER_ADMIN`, `ADMIN`, `PROJECT_MANAGER`, `DEVELOPER`, `USER`).
+  - `name`: Human-readable display name.
+  - `description`: Optional text.
+  - `is_system`: Boolean flag protecting core roles from deletion or code modification.
+  - `permissions`: Many-to-many relationship with `django.contrib.auth.models.Permission`.
+  - `groups`: Many-to-many relationship with `django.contrib.auth.models.Group`.
+- **`UserRole`** — Explicit intermediary through-model linking `User` and `Role` with audit timestamps and soft-delete support (`unique_user_role` constraint).
+- **`User.roles`** — Many-to-many relationship connecting users to roles via `UserRole`.
+
+#### 2. Effective Permission Calculation (4 Additive Tiers)
+Effective permissions are evaluated additively without explicit deny rules:
+1. **Tier 1:** Direct user permissions (`User.user_permissions`)
+2. **Tier 2:** Permissions from groups assigned directly to the user (`User.groups.permissions`)
+3. **Tier 3:** Permissions assigned directly to the user's active roles (`Role.permissions`)
+4. **Tier 4:** Permissions inherited from groups assigned to the user's active roles (`Role.groups.permissions`)
+*Superusers automatically have all permissions.*
+*Unauthenticated or inactive users always fail with `False`.*
+
+Django's native backend integration is provided via `RolePermissionBackend` in `AUTHENTICATION_BACKENDS`, ensuring standard calls like `request.user.has_perm('app.action')` and `request.user.get_all_permissions()` include all role and role-group permissions.
+
+#### 3. Single Source of Truth (`authentication/system_roles.py`)
+All canonical system roles, descriptions, and default permissions are defined in code in [`authentication/system_roles.py`](../authentication/system_roles.py).
+
+To synchronize roles with the database:
+```bash
+# Preview changes without modifying database
+python manage.py sync_roles --dry-run
+
+# Apply additions and updates
+python manage.py sync_roles
+
+# Safely prune obsolete roles (roles with active user assignments are soft-deleted to protect users)
+python manage.py sync_roles --prune
+
+# Generate a data migration for automated CI/CD deployment
+python manage.py sync_roles --create-migration add_new_roles
+```
+
+#### 4. View Integration (`@authorize` Decorator)
+The `@authorize` decorator supports function-based views, class-based view methods, and async view functions with `AND` / `OR` composition:
+
+```python
+from core.utils.decorators import authorize
+
+# Role-only check
+@authorize(strict="SUPER_ADMIN")
+def delete_user(request, user_id):
+    ...
+
+# Permission-only check
+@authorize(permission="projects.view_project")
+def project_list(request):
+    ...
+
+# Role AND Permission check (default operator is AND)
+@authorize(
+    strict="PROJECT_MANAGER",
+    permission="projects.change_project",
+    operator="AND",
+)
+def update_project(request, project_id):
+    ...
+
+# Role OR Permission check
+@authorize(
+    strict="PROJECT_MANAGER",
+    permission="projects.change_project",
+    operator="OR",
+)
+def alternative_update_project(request, project_id):
+    ...
+```
+
+#### 5. DRF Permission Classes
+For standard class-based `APIView` and `ViewSet` classes:
+
+```python
+from rest_framework.views import APIView
+from core.utils.permissions import HasRole, HasPermission, AuthorizePermission
+
+class ProjectManagementView(APIView):
+    permission_classes = [
+        AuthorizePermission(
+            roles=["PROJECT_MANAGER"],
+            permissions=["projects.change_project"],
+            operator="AND",
+        )
+    ]
+```
+
+#### 6. Object-Level Authorization
+Use `check_object_permission(user, permission, obj)` or provide `object_getter` to `@authorize` for record-level authorization.
+
+#### 7. Automatic Cache Invalidation
+Whenever a user's permissions, groups, roles, or role permissions change, Django signal handlers in `authentication/signals.py` automatically clear all in-memory permission and role caches.
+
+
 ## 10. Background Tasks
 
 Celery handles all asynchronous work. The broker and result backend are both Redis.

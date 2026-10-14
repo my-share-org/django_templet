@@ -484,3 +484,41 @@ class ProjectManagementView(APIView):
         )
     ]
 ```
+
+### System Roles Definition & Synchronization Workflow
+
+The canonical single source of truth for all system roles is [`authentication/system_roles.py`](../system_roles.py).
+
+#### Adding or Editing a System Role:
+1. Open `authentication/system_roles.py`.
+2. Add or update the role definition in `SYSTEM_ROLES`:
+```python
+RoleDefinition(
+    code=SystemRole.FINANCE_MANAGER,
+    name="Finance Manager",
+    description="Manages invoicing, payouts, and ledger entries.",
+    is_system=True,
+    permissions=("invoices.view_invoice", "invoices.change_invoice"),
+)
+```
+3. Synchronize the database using one of two options:
+
+**Option A — Management Command (Direct):**
+```bash
+# Preview changes without modifying database
+python manage.py sync_roles --dry-run
+
+# Apply changes directly
+python manage.py sync_roles
+
+# Safely prune obsolete roles (roles with active users will be soft-deleted, not hard-deleted)
+python manage.py sync_roles --prune
+```
+
+**Option B — Via Migration (CI/CD Pipeline):**
+If your deployment pipeline runs `python manage.py migrate` automatically:
+```bash
+python manage.py sync_roles --create-migration add_finance_manager
+```
+This generates a new migration file in `authentication/migrations/` that safely calls `sync_system_roles()` during deployment.
+

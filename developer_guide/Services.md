@@ -5,7 +5,9 @@
 ## Table of Contents
 
 - [authentication](#authentication)
-  - [services/password.py](#servicespythonpy)
+  - [services/password.py](#servicespasswordpy)
+  - [services/permissions.py](#servicespermissionspy)
+  - [services/roles.py](#servicesrolespy)
 - [otp](#otp)
   - [services/otp.py](#servicesotppy)
   - [services/rules.py](#servicesrulespy)
@@ -35,6 +37,65 @@ Call only after confirming the current password with `user.check_password()`.
 **Raises:** `ValidationError` if no account found for that email, or if the new password fails validators  
 
 Call only after OTP verification is confirmed. Never expose directly without OTP gating.
+
+---
+
+### `services/permissions.py`
+
+#### `has_role(user, role)`
+**Takes:** User instance, role code string (e.g. `"SUPER_ADMIN"`) or `Role` model instance  
+**Returns:** `bool` — `True` if active authenticated user has the specified role, `False` otherwise  
+**Rules:** Unauthenticated or inactive users always return `False`. Case-insensitive.
+
+---
+
+#### `has_any_role(user, roles)`
+**Takes:** User instance, iterable of role code strings or `Role` instances  
+**Returns:** `bool` — `True` if user has at least one of the specified roles  
+**Rules:** Empty collection returns `False`.
+
+---
+
+#### `has_all_roles(user, roles)`
+**Takes:** User instance, iterable of role code strings or `Role` instances  
+**Returns:** `bool` — `True` if user has all specified roles  
+**Rules:** Empty collection returns `False`.
+
+---
+
+#### `has_permission(user, permission, obj=None)`
+**Takes:** User instance, permission code (`"app_label.codename"`) or `Permission` instance, optional object  
+**Returns:** `bool` — `True` if granted through any source (direct, user group, role, role group, or superuser)  
+**Rules:** Unauthenticated or inactive users always return `False`.
+
+---
+
+#### `has_any_permission(user, permissions, obj=None)`
+**Takes:** User instance, iterable of permission codes  
+**Returns:** `bool` — `True` if at least one permission is granted. Empty collection returns `False`.
+
+---
+
+#### `has_all_permissions(user, permissions, obj=None)`
+**Takes:** User instance, iterable of permission codes  
+**Returns:** `bool` — `True` only if all specified permissions are granted. Empty collection returns `False`.
+
+---
+
+#### `assign_role(user, role)` / `remove_role(user, role)`
+**Takes:** User instance, role code string or `Role` instance  
+**Returns:** `UserRole` instance (for assign), `bool` (for remove)  
+**Rules:** Automatically invalidates user permission and role cache.
+
+---
+
+### `services/roles.py`
+
+#### `sync_system_roles(prune=False, dry_run=False, role_definitions=None)`
+**Takes:** optional `prune` boolean, `dry_run` boolean, custom `role_definitions` list  
+**Returns:** dict summary: `{"created": [...], "updated": [...], "unchanged": [...], "pruned": [...], "protected_from_prune": [...]}`  
+**Rules:** Synchronizes database roles with `authentication.system_roles.SYSTEM_ROLES`. If `prune=True`, roles with active assigned users are safely soft-deleted rather than hard-deleted.
+
 
 ---
 
