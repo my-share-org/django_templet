@@ -45,3 +45,50 @@ class EmailMaskingTests(TestCase):
         self.assertIn("987654", kwargs["body"])
         self.assertIn("******", kwargs["log_body"])
         self.assertNotIn("987654", kwargs["log_body"])
+
+    def test_send_email_core_marks_sent_and_records_sent_at(self):
+        from emails.choices import EmailStatus
+        log = send_email_core(
+            subject="Success test",
+            to_emails=["success@example.com"],
+            body="Hello",
+            purpose=EmailPurpose.OTHERS,
+        )
+        log.refresh_from_db()
+        self.assertEqual(log.status, EmailStatus.SENT)
+        self.assertIsNotNone(log.sent_at)
+
+    @patch("django.core.mail.EmailMultiAlternatives.send", side_effect=Exception("SMTP down"))
+    def test_send_email_core_marks_failed_on_send_error(self, mock_send):
+        from emails.choices import EmailStatus
+        with self.assertRaises(Exception):
+            send_email_core(
+                subject="Fail test",
+                to_emails=["fail@example.com"],
+                body="Hello",
+                purpose=EmailPurpose.OTHERS,
+            )
+        log = EmailLog.objects.filter(to_emails="fail@example.com").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.status, EmailStatus.FAILED)
+
+    def test_send_email_core_reuses_existing_log_and_increments_try_count(self):
+        log1 = send_email_core(
+            subject="Retry test",
+            to_emails=["retry@example.com"],
+            body="First try",
+            purpose=EmailPurpose.OTHERS,
+        )
+        self.assertEqual(log1.try_count, 1)
+
+        log2 = send_email_core(
+            subject="Retry test",
+            to_emails=["retry@example.com"],
+            body="Second try",
+            email_log_id=log1.id,
+            purpose=EmailPurpose.OTHERS,
+        )
+        log1.refresh_from_db()
+        self.assertEqual(log1.id, log2.id)
+        self.assertEqual(log1.try_count, 2)
+        self.assertEqual(EmailLog.objects.filter(to_emails="retry@example.com").count(), 1)

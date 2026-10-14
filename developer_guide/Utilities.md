@@ -200,8 +200,8 @@ Zero-DB-hit utility for reflecting on the Django app registry.
 | Method | Takes | Returns |
 |---|---|---|
 | `get_all_apps(app_labels=None)` | optional list of app label strings | list of app config objects |
-| `get_models(apps, model_names=None)` | app configs, optional model name filter | list of model classes |
-| `get_model_fields(models, field_names=None)` | model classes, optional field name filter | list of non-relation field objects |
+| `get_models(app_configs=None, model_names=None)` | optional list of app configs, optional model name filter | list of model classes |
+| `get_model_fields(model, field_names=None)` | model class or instance, optional field name filter | list of non-relation field objects |
 
 ---
 

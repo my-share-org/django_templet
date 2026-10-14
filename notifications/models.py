@@ -19,6 +19,10 @@ class Notification(BaseModel):
         ordering = ["-created_at"]
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
+        indexes = [
+            models.Index(fields=["user", "is_read", "-created_at"], name="notif_user_unread_idx"),
+            models.Index(fields=["user", "-created_at"], name="notif_user_created_idx"),
+        ]
 
     def __str__(self):
         return f"{self.user_id} — {self.title} [{'read' if self.is_read else 'unread'}]"

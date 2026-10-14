@@ -60,3 +60,26 @@ class TestActivityMiddlewareIntegration:
         middleware(req)
 
         assert UserActivity.objects.count() == initial_count
+
+    def test_activity_tracking_resolves_session_when_authenticated_during_view(self, test_user):
+        factory = RequestFactory()
+        req = factory.get("/v1/notifications/")
+        req.user = AnonymousUser()
+        req.request_id = "jwt-req-456"
+
+        def simulate_drf_view(r):
+            # DRF view authenticates the request via Bearer token
+            r.user = test_user
+            return HttpResponse("OK", status=200)
+
+        middleware = ActivityTrackingMiddleware(get_response=simulate_drf_view)
+        resp = middleware(req)
+
+        assert resp.status_code == 200
+        assert req.activity_session is not None
+        assert req.activity_session.user == test_user
+        assert req.activity_session.is_active is True
+
+        activity = UserActivity.objects.filter(user=test_user, request_id="jwt-req-456").first()
+        assert activity is not None
+        assert activity.session == req.activity_session

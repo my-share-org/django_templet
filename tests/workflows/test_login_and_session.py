@@ -52,6 +52,10 @@ class TestLoginAndSessionLifecycleWorkflow:
         assert logout_resp.status_code == status.HTTP_200_OK
         assert logout_resp.data["success"] is True
 
+        # Verify active user sessions are terminated
+        from activity.models import UserSession
+        assert UserSession.objects.filter(user=test_user, is_active=True).count() == 0
+
         # 6. Verify blacklisted token is rejected
         blocked_refresh = api_client.post("/v1/auth/token/refresh/", {"refresh": new_refresh}, format="json")
         assert blocked_refresh.status_code == status.HTTP_401_UNAUTHORIZED

@@ -65,6 +65,11 @@ class LogoutView(APIView):
         try:
             token = RefreshToken(refresh_token)
             token.blacklist()
+            if hasattr(request, "user") and request.user.is_authenticated:
+                from activity.services import end_all_user_sessions
+                end_all_user_sessions(request.user)
+                request._session_ended = True
+                request.activity_session = None
             return success_response(
                 message="Logged out successfully",
                 status_code=status.HTTP_200_OK,

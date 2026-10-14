@@ -13,6 +13,7 @@ from core.utils.exception_handler import custom_exception_handler, handle_404, h
 from core.utils.general import get_or_400, get_client_ip
 from core.utils.image import process_image, ImageConfig
 from core.utils.generators import random_string
+from core.utils.app_model_relate import ModelInspector
 
 
 @pytest.mark.unit
@@ -168,3 +169,36 @@ class TestGeneratorsUnit:
         s = random_string(length=12, allow_numbers=True, allow_capital=False, allow_small=False, allow_special=False)
         assert len(s) == 12
         assert s.isdigit()
+
+
+@pytest.mark.unit
+class TestModelInspectorUnit:
+    def test_get_all_apps(self):
+        inspector = ModelInspector()
+        all_apps = inspector.get_all_apps()
+        assert len(all_apps) > 0
+
+        filtered = inspector.get_all_apps(app_labels=["authentication", "notifications"])
+        assert {app.label for app in filtered} == {"authentication", "notifications"}
+
+    def test_get_models(self):
+        inspector = ModelInspector()
+        all_models = inspector.get_models()
+        assert len(all_models) > 0
+
+        named = inspector.get_models(model_names=["User", "Notification"])
+        names = {m.__name__ for m in named}
+        assert "User" in names
+        assert "Notification" in names
+
+    def test_get_model_fields(self):
+        from notifications.models import Notification
+        inspector = ModelInspector()
+        fields = inspector.get_model_fields(Notification)
+        field_names = {f.name for f in fields}
+        assert "title" in field_names
+        assert "is_read" in field_names
+
+        filtered_fields = inspector.get_model_fields(Notification, field_names=["title"])
+        assert len(filtered_fields) == 1
+        assert filtered_fields[0].name == "title"

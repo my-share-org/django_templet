@@ -56,6 +56,23 @@ class ActivityTrackingMiddleware:
             if request.path.startswith(_get_skip_paths()):
                 return response
 
+            # If user authenticated during the view (e.g. via JWT authentication in DRF),
+            # resolve or create the session now if it was not resolved during process_request.
+            if getattr(request, "activity_session", None) is None:
+                if (
+                    getattr(request, "user", None)
+                    and request.user.is_authenticated
+                    and not getattr(request, "_session_ended", False)
+                    and not request.path.rstrip("/").endswith("/logout")
+                ):
+                    try:
+                        request.activity_session = self._get_or_create_session(request)
+                    except Exception as exc:
+                        logger.warning(
+                            "ActivityTrackingMiddleware: session resolution failed in response: %s", exc,
+                            extra={"event_name": "activity.session.resolve_error"},
+                        )
+
             duration_ms = int((time.monotonic() - request._activity_start_time) * 1000)
 
             record_activity(
@@ -93,7 +110,10 @@ class ActivityTrackingMiddleware:
             .first()
         )
         if session is None:
+            if getattr(request, "_session_ended", False) or request.path.rstrip("/").endswith("/logout"):
+                return None
             session = start_session(user, request)
 
-        cache.set(cache_key, session.session_key, timeout=3600)
+        if session:
+            cache.set(cache_key, session.session_key, timeout=3600)
         return session

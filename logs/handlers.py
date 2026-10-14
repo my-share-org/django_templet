@@ -1,4 +1,5 @@
 import logging
+from django.db import close_old_connections
 from django.utils import timezone
 
 class DatabaseHandler(logging.Handler):
@@ -45,7 +46,11 @@ class DatabaseHandler(logging.Handler):
                 "user_agent": getattr(record, "user_agent", None),
             }
 
-            SystemLog.objects.create(**kwargs)
+            close_old_connections()
+            try:
+                SystemLog.objects.create(**kwargs)
+            finally:
+                close_old_connections()
             
         except Exception:
             self.handleError(record)

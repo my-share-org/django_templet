@@ -5,6 +5,7 @@ class EmailBodyType(TextChoices):
     TEXT = 'text', 'TEXT'
 
 class EmailStatus(TextChoices):
+    PENDING = 'pending', 'PENDING'
     SENT = 'sent', 'SENT'
     FAILED = 'failed', 'FAILED'
     SCHEDULED = 'scheduled', 'SCHEDULED'

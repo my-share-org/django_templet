@@ -122,7 +122,6 @@ INSTALLED_APPS = [
     'core',
     'emails',
     'otp',
-    'my_test',
     'logs',
     'activity',
     'notifications',

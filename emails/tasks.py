@@ -4,8 +4,15 @@ from emails.utils.general import send_email_core
 
 @shared_task(
     bind=True,
-    autoretry_for=(SMTPException, ConnectionError),
-    retry_kwargs={"max_retries": 3, "countdown": 30},
-    retry_backoff=True,)
+    max_retries=3,
+)
 def send_email_task(self, **kwargs):
-    send_email_core(**kwargs)
+    email_log_id = kwargs.get("email_log_id")
+    try:
+        log = send_email_core(**kwargs)
+        return log.id if log else None
+    except (SMTPException, ConnectionError) as exc:
+        if not email_log_id and hasattr(exc, "email_log_id"):
+            kwargs["email_log_id"] = exc.email_log_id
+        countdown = 30 * (2 ** self.request.retries)
+        raise self.retry(exc=exc, countdown=countdown, kwargs=kwargs)

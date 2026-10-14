@@ -1,6 +1,7 @@
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from emails.models import EmailLog
 from emails.choices import (
     EmailStatus,
@@ -57,6 +58,7 @@ def send_email_core(
                 "body": saved_body,
                 "body_type": body_type,
                 "purpose": purpose,
+                "status": EmailStatus.PENDING,
             }
         )
         log_serializer.is_valid(raise_exception=True)
@@ -73,11 +75,19 @@ def send_email_core(
         if body_type == EmailBodyType.HTML:
             email.attach_alternative(body, "text/html")
 
-        email.send()
+        try:
+            email.send()
+            EmailLog.objects.filter(id=email_log.id).update(
+                status=EmailStatus.SENT,
+                sent_at=timezone.now(),
+            )
+        except Exception as exc:
+            EmailLog.objects.filter(id=email_log.id).update(
+                status=EmailStatus.FAILED,
+            )
+            exc.email_log_id = email_log.id
+            raise
 
-        EmailLog.objects.filter(id=email_log.id).update(
-            status=EmailStatus.SENT
-        )
-
-    transaction.on_commit(_send)
+    _send()
+    return email_log
 

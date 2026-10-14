@@ -4,16 +4,16 @@ from typing import Optional
 from datetime import timedelta
 
 from django.conf import settings
+from django.template.loader import render_to_string
 from django.utils.crypto import get_random_string
+from rest_framework.exceptions import ValidationError
+import hashlib
 
 from core.cache.redis_client import redis_client
 from core.utils.generators import random_string
 from otp.choices import OtpPurpose, OtpChannel
 from emails.tasks import send_email_task
 from emails.choices import EmailBodyType
-from django.template.loader import render_to_string
-from django.conf import settings
-import hashlib
 
 CONFIG = settings.CONFIG
 
@@ -39,8 +39,12 @@ class OTPService:
 
     @staticmethod
     def _hash_otp(otp: str) -> str:
-        """Hash OTP before storing."""
-        return hashlib.sha256(otp.encode()).hexdigest()
+        """Hash OTP before storing using HMAC-SHA256 with project SECRET_KEY."""
+        return hmac.new(
+            settings.SECRET_KEY.encode(),
+            otp.encode(),
+            hashlib.sha256,
+        ).hexdigest()
 
     @classmethod
     def _otp_key(cls, purpose: OtpPurpose, user_hash: str, otp_id: str) -> str:
@@ -208,7 +212,7 @@ class OTPService:
                     purpose=purpose,
                 )
             case OtpChannel.PHONE:
-                raise NotImplementedError("SMS OTP channel is not yet implemented")
+                raise ValidationError({"channel": ["SMS OTP delivery channel is not yet configured."]})
             case _:
-                raise ValueError("Invalid OTP channel")
+                raise ValidationError({"channel": ["Invalid OTP channel."]})
     

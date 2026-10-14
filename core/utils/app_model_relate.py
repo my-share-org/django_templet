@@ -13,39 +13,42 @@ class ModelInspector:
     # -------------------------
     # App-level methods
     # -------------------------
-    def get_all_apps(self, app_labels: List[str] = None) -> List[AppConfig]:
+    def get_all_apps(self, app_labels: Optional[List[str]] = None) -> List[AppConfig]:
         """
         Return all installed apps. If app_labels are provided, return only the apps with the given labels.
         """
         if app_labels:
             return [app for app in apps.get_app_configs() if app.label in app_labels]
-        else:
-            return list(apps.get_app_configs())
-
+        return list(apps.get_app_configs())
 
     # -------------------------
     # Model-level methods
     # -------------------------
-    def get_models(self, apps: List[AppConfig] = None, model_names: List[str] = None) -> List[models.Model]:
+    def get_models(
+        self,
+        app_configs: Optional[List[AppConfig]] = None,
+        model_names: Optional[List[str]] = None,
+    ) -> List[type[models.Model]]:
         """
-        Return all models in the given app.
+        Return all models in the given app configs or installed apps.
         """
-        if apps:
+        if app_configs:
             if model_names:
-                return [model for app in apps for model in app.get_models() if model.__name__ in model_names]
-            else:
-                return [model for app in apps for model in app.get_models()]
+                return [model for app in app_configs for model in app.get_models() if model.__name__ in model_names]
+            return [model for app in app_configs for model in app.get_models()]
         elif model_names:
-            return [model for model in models.get_models() if model.__name__ in model_names]
+            return [model for model in apps.get_models() if model.__name__ in model_names]
         else:
-            return list(models.get_models())
+            return list(apps.get_models())
 
-    
-    def get_model_fields(self, models: models.Model, field_names: List[str] = None) -> List[models.Field]:
+    def get_model_fields(
+        self,
+        model: type[models.Model] | models.Model,
+        field_names: Optional[List[str]] = None,
+    ) -> List[models.Field]:
         """
-        Return all fields in the given model.
+        Return all non-relational fields in the given model.
         """
         if field_names:
-            return [field for field in models._meta.get_fields() if not field.is_relation and field.name in field_names]
-        else:
-            return [field for field in models._meta.get_fields() if not field.is_relation]
+            return [field for field in model._meta.get_fields() if not field.is_relation and field.name in field_names]
+        return [field for field in model._meta.get_fields() if not field.is_relation]

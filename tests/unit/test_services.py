@@ -81,6 +81,32 @@ class TestOTPServiceUnit:
         assert kwargs["to_emails"] == [identifier]
         assert "******" in kwargs["log_body"]
 
+    def test_otp_hash_uses_hmac_sha256_with_secret_key(self, fake_redis_client):
+        import hmac
+        import hashlib
+        identifier = "secure_hash@example.com"
+        otp = OTPService.generate(user=identifier, purpose=OtpPurpose.REGISTRATION)
+
+        user_hash = OTPService._user_hash(identifier)
+        index_key = OTPService._index_key(OtpPurpose.REGISTRATION, user_hash)
+        otp_id = fake_redis_client.lrange(index_key, 0, -1)[0]
+        otp_key = OTPService._otp_key(OtpPurpose.REGISTRATION, user_hash, otp_id)
+        stored_hash = fake_redis_client.get(otp_key)
+
+        expected_hash = hmac.new(
+            settings.SECRET_KEY.encode(),
+            otp.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        assert stored_hash == expected_hash
+
+    def test_otp_send_phone_channel_raises_validation_error(self, fake_redis_client):
+        from rest_framework.exceptions import ValidationError
+        identifier = "phone_user@example.com"
+        with pytest.raises(ValidationError) as exc_info:
+            OTPService.send(user=identifier, purpose=OtpPurpose.REGISTRATION, channel=OtpChannel.PHONE)
+        assert "channel" in exc_info.value.detail
+
 
 @pytest.mark.unit
 @pytest.mark.django_db
