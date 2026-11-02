@@ -2,12 +2,12 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from core.models import BaseModel
-from notifications.models import Notification
-from logs.models import SystemLog
-from activity.models import UserSession, UserActivity
-from emails.models import EmailLog
-from emails.choices import EmailPurpose, EmailStatus
+from apps.core.models import BaseModel
+from apps.notifications.models import Notification
+from apps.logs.models import SystemLog
+from apps.activity.models import UserSession, UserActivity
+from apps.emails.models import EmailLog
+from apps.emails.choices import EmailPurpose, EmailStatus
 
 User = get_user_model()
 

@@ -180,7 +180,7 @@ def update_project(request, project_id): ...
 **Takes:** component name string, status message string  
 **Returns:** `{"name": ..., "status": "healthy", "message": ...}`  
 
-For use only inside `core/health/` check functions.
+For use only inside `apps/core/health/` check functions.
 
 ---
 
@@ -188,7 +188,7 @@ For use only inside `core/health/` check functions.
 **Takes:** component name string, status message string, optional exception  
 **Returns:** `{"name": ..., "status": "unhealthy", "message": ..., "error": str(errors)}`  
 
-For use only inside `core/health/` check functions.
+For use only inside `apps/core/health/` check functions.
 
 ---
 
@@ -205,7 +205,7 @@ Zero-DB-hit utility for reflecting on the Django app registry.
 
 ---
 
-### `core/tasks.py`
+### `apps/core/tasks.py`
 
 #### `beat_heartbeat` (Celery task)
 **Takes:** nothing  
@@ -217,7 +217,7 @@ Writes current UTC timestamp to `"beat_last_seen"` cache key. Scheduled every 60
 
 ## authentication
 
-### `authentication/throttles.py`
+### `apps/authentication/throttles.py`
 
 | Class | Scope key | Applied to |
 |---|---|---|
@@ -229,7 +229,7 @@ Rates are set in `settings.py` under `DEFAULT_THROTTLE_RATES`.
 
 ---
 
-### `authentication/managers/user.py`
+### `apps/authentication/managers/user.py`
 
 #### `UserManager.create_user(email, password, **extra_fields)`
 **Takes:** email string (required, non-empty), password, any additional model fields  
@@ -246,7 +246,7 @@ Rates are set in `settings.py` under `DEFAULT_THROTTLE_RATES`.
 
 ## otp
 
-### `otp/throttles.py`
+### `apps/otp/throttles.py`
 
 | Class | Scope key | Applied to |
 |---|---|---|
@@ -258,7 +258,7 @@ Rate is per-day. Configured in `settings.py` under `DEFAULT_THROTTLE_RATES`. Sub
 
 ## emails
 
-### `emails/tasks.py`
+### `apps/emails/tasks.py`
 
 #### `send_email_task` (Celery task)
 **Takes:** `subject`, `to_emails` (list), `body`, `body_type` (`EmailBodyType` value)  

@@ -22,7 +22,7 @@ A production-ready Django REST API backend with authentication, OTP verification
 ## Features
 
 - **JWT Authentication** — Register, login, logout, token refresh/verify, password change, OTP-gated password reset
-- **Role & Permission Authorization** — Database roles, many-to-many user assignments, additive effective permissions across 4 tiers, `@authorize` view decorator (FBV, CBV, Async), DRF permission classes (`HasRole`, `HasPermission`, `AuthorizePermission`), object-level checks, and automated `sync_roles` command based on canonical `authentication/system_roles.py` definitions
+- **Role & Permission Authorization** — Database roles, many-to-many user assignments, additive effective permissions across 4 tiers, `@authorize` view decorator (FBV, CBV, Async), DRF permission classes (`HasRole`, `HasPermission`, `AuthorizePermission`), object-level checks, and automated `sync_roles` command based on canonical `apps/authentication/system_roles.py` definitions
 - **OTP System** — Redis-backed, SHA-256 hashed, single-use, configurable TTL and length. Email channel implemented; SMS channel ready for integration
 - **Async Email** — Celery task with auto-retry on SMTP failure (3 retries, exponential backoff)
 - **In-app Notifications** — Create, list (paginated), mark read, mark all read, unread count
@@ -38,18 +38,19 @@ A production-ready Django REST API backend with authentication, OTP verification
 ## Project Structure
 
 ```
-├── authentication/       # User model, Role & UserRole models, JWT auth, system_roles.py, sync_roles command
-├── otp/                  # OTP generation, verification, delivery rules
-
-├── emails/               # Email tasks, logs, OTP email service
-├── notifications/        # In-app notification model, service, API
-├── logs/                 # Structured system log model and middleware
-├── core/                 # Shared foundation
-│   ├── health/           # Per-service health check functions
-│   ├── services/         # health_report() aggregator
-│   ├── utils/            # response, exception_handler, pagination,
-│   │                     # image, validators, generators, decorators, query
-│   └── models.py         # BaseModel (abstract)
+├── apps/                 # Django apps
+│   ├── authentication/   # User model, Role & UserRole models, JWT auth, system_roles.py, sync_roles command
+│   ├── otp/              # OTP generation, verification, delivery rules
+│   ├── emails/           # Email tasks, logs, OTP email service
+│   ├── notifications/    # In-app notification model, service, API
+│   ├── logs/             # Structured system log model and middleware
+│   ├── activity/         # Product analytics — sessions and per-request tracking
+│   └── core/             # Shared foundation
+│       ├── health/       # Per-service health check functions
+│       ├── services/     # health_report() aggregator
+│       ├── utils/        # response, exception_handler, pagination,
+│       │                 # image, validators, generators, decorators, query
+│       └── models.py     # BaseModel (abstract)
 ├── my_django/            # Django project config, settings, URLs, Celery
 │   ├── settings.py
 │   ├── urls.py
@@ -160,7 +161,7 @@ All endpoints are prefixed with `/v1/`. All responses follow the unified envelop
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/v1/otp/get-otp/` | No | Request an OTP (registration, password reset, etc.) |
+| POST | `/v1/otp/get-apps/otp/` | No | Request an OTP (registration, password reset, etc.) |
 
 **Body:**
 ```json
@@ -241,14 +242,14 @@ Checks: Database, Redis, Email Service (SMTP), Celery Worker, Celery Beat.
 ### Registration
 
 ```
-1. POST /v1/otp/get-otp/    { purpose: "registration", user_identifier: "email" }
+1. POST /v1/otp/get-apps/otp/    { purpose: "registration", user_identifier: "email" }
 2. POST /v1/auth/register/  { email, first_name, last_name, password, otp }
 ```
 
 ### Password Reset
 
 ```
-1. POST /v1/otp/get-otp/         { purpose: "password_reset", user_identifier: "email" }
+1. POST /v1/otp/get-apps/otp/         { purpose: "password_reset", user_identifier: "email" }
 2. POST /v1/auth/password/reset/ { email, otp, new_password }
 ```
 

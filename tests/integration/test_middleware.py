@@ -3,9 +3,9 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 from django.contrib.auth.models import AnonymousUser
 
-from logs.middleware import LoggingContextMiddleware
-from activity.middleware import ActivityTrackingMiddleware
-from activity.models import UserActivity, UserSession
+from apps.logs.middleware import LoggingContextMiddleware
+from apps.activity.middleware import ActivityTrackingMiddleware
+from apps.activity.models import UserActivity, UserSession
 
 
 @pytest.mark.integration

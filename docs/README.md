@@ -97,12 +97,12 @@ The backend follows a modular application architecture, where each concern is is
 
 | App | Responsibility |
 |---|---|
-| [`authentication`](../authentication/docs/README.md) | Custom user model, registration, login, logout, password management |
-| [`core`](../core/docs/README.md) | Shared utilities, response helpers, health checks, Redis client |
-| [`otp`](../otp/docs/README.md) | OTP generation, storage, verification, and per-purpose policies |
-| [`emails`](../emails/docs/README.md) | Transactional email delivery, async tasks, email audit log |
-| [`logs`](../logs/docs/README.md) | Structured logging, request context middleware, `SystemLog` model |
-| [`activity`](../activity/docs/README.md) | Product analytics — `UserSession`/`UserActivity`, correlated with `logs` via a shared `request_id` |
+| [`authentication`](../apps/authentication/docs/README.md) | Custom user model, registration, login, logout, password management |
+| [`core`](../apps/core/docs/README.md) | Shared utilities, response helpers, health checks, Redis client |
+| [`otp`](../apps/otp/docs/README.md) | OTP generation, storage, verification, and per-purpose policies |
+| [`emails`](../apps/emails/docs/README.md) | Transactional email delivery, async tasks, email audit log |
+| [`logs`](../apps/logs/docs/README.md) | Structured logging, request context middleware, `SystemLog` model |
+| [`activity`](../apps/activity/docs/README.md) | Product analytics — `UserSession`/`UserActivity`, correlated with `logs` via a shared `request_id` |
 
 Each app contains its own `docs/` folder with detailed documentation specific to that module.
 
@@ -325,7 +325,7 @@ All API responses follow a consistent envelope format:
 | `POST` | `/v1/auth/token/refresh/` | Obtain a new access token | No |
 | `GET` | `/v1/auth/verify/` | Verify the current session | Yes |
 | `POST` | `/v1/auth/password/change/` | Change authenticated user's password | Yes |
-| `POST` | `/v1/otp/get-otp/` | Request a one-time password | Conditional |
+| `POST` | `/v1/otp/get-apps/otp/` | Request a one-time password | Conditional |
 
 For detailed request/response schemas, refer to the individual app documentation.
 
@@ -397,8 +397,8 @@ Effective permissions are evaluated additively without explicit deny rules:
 
 Django's native backend integration is provided via `RolePermissionBackend` in `AUTHENTICATION_BACKENDS`, ensuring standard calls like `request.user.has_perm('app.action')` and `request.user.get_all_permissions()` include all role and role-group permissions.
 
-#### 3. Single Source of Truth (`authentication/system_roles.py`)
-All canonical system roles, descriptions, and default permissions are defined in code in [`authentication/system_roles.py`](../authentication/system_roles.py).
+#### 3. Single Source of Truth (`apps/authentication/system_roles.py`)
+All canonical system roles, descriptions, and default permissions are defined in code in [`apps/authentication/system_roles.py`](../apps/authentication/system_roles.py).
 
 To synchronize roles with the database:
 ```bash
@@ -419,7 +419,7 @@ python manage.py sync_roles --create-migration add_new_roles
 The `@authorize` decorator supports function-based views, class-based view methods, and async view functions with `AND` / `OR` composition:
 
 ```python
-from core.utils.decorators import authorize
+from apps.core.utils.decorators import authorize
 
 # Role-only check
 @authorize(strict="SUPER_ADMIN")
@@ -455,7 +455,7 @@ For standard class-based `APIView` and `ViewSet` classes:
 
 ```python
 from rest_framework.views import APIView
-from core.utils.permissions import HasRole, HasPermission, AuthorizePermission
+from apps.core.utils.permissions import HasRole, HasPermission, AuthorizePermission
 
 class ProjectManagementView(APIView):
     permission_classes = [
@@ -471,7 +471,7 @@ class ProjectManagementView(APIView):
 Use `check_object_permission(user, permission, obj)` or provide `object_getter` to `@authorize` for record-level authorization.
 
 #### 7. Automatic Cache Invalidation
-Whenever a user's permissions, groups, roles, or role permissions change, Django signal handlers in `authentication/signals.py` automatically clear all in-memory permission and role caches.
+Whenever a user's permissions, groups, roles, or role permissions change, Django signal handlers in `apps/authentication/signals.py` automatically clear all in-memory permission and role caches.
 
 
 ## 10. Background Tasks
@@ -482,14 +482,14 @@ Celery handles all asynchronous work. The broker and result backend are both Red
 
 | Task | Module | Trigger |
 |---|---|---|
-| `send_email_task` | `emails.tasks` | Called when an email needs to be sent |
-| `beat_heartbeat` | `core.tasks` | Periodic — every 1 minute |
+| `send_email_task` | `apps.emails.tasks` | Called when an email needs to be sent |
+| `beat_heartbeat` | `apps.core.tasks` | Periodic — every 1 minute |
 
 ### Periodic Schedule
 
 | Schedule Name | Task | Interval |
 |---|---|---|
-| `beat-heartbeat` | `core.tasks.beat_heartbeat` | Every 60 seconds |
+| `beat-heartbeat` | `apps.core.tasks.beat_heartbeat` | Every 60 seconds |
 
 All tasks are serialized as JSON and run in UTC timezone.
 
@@ -516,7 +516,7 @@ Every log entry produced during a request automatically includes:
 
 ### Correlation with Activity Tracking
 
-`SystemLog.request_id` and `activity.UserActivity.request_id` (see [`activity`](../activity/docs/README.md)) carry the same UUID for the same HTTP request — a soft correlation key, never a foreign key. The two systems write independently and asynchronously (logs via a background queue thread, activity via Celery); they're joined only at query time:
+`SystemLog.request_id` and `activity.UserActivity.request_id` (see [`activity`](../apps/activity/docs/README.md)) carry the same UUID for the same HTTP request — a soft correlation key, never a foreign key. The two systems write independently and asynchronously (logs via a background queue thread, activity via Celery); they're joined only at query time:
 
 ```sql
 SELECT sl.event_name, sl.log_level, ua.service, ua.duration_ms
@@ -598,12 +598,14 @@ An `entrypoint.sh` script handles startup logic (migrations, static files collec
 │   └── configs/
 │       └── celery_schedules.py # Celery Beat periodic task definitions
 │
-├── authentication/             # User authentication module
-├── core/                       # Shared utilities and health monitoring
-├── emails/                     # Email delivery service
-├── otp/                        # One-time password service
-├── logs/                       # Structured logging and audit trail
-├── activity/                   # Product analytics — sessions & per-request tracking
+├── apps/                       # Django apps
+│   ├── authentication/         # User authentication module
+│   ├── core/                   # Shared utilities and health monitoring
+│   ├── emails/                 # Email delivery service
+│   ├── otp/                    # One-time password service
+│   ├── logs/                   # Structured logging and audit trail
+│   ├── activity/               # Product analytics — sessions & per-request tracking
+│   └── notifications/          # In-app notifications
 │
 ├── docs/                       # Project-level documentation (this folder)
 ├── docker/                     # Docker build files

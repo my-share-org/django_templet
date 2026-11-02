@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import patch
 
-from emails.tasks import send_email_task
-from emails.models import EmailLog
-from emails.choices import EmailPurpose, EmailStatus
+from apps.emails.tasks import send_email_task
+from apps.emails.models import EmailLog
+from apps.emails.choices import EmailPurpose, EmailStatus
 
 
 @pytest.mark.integration

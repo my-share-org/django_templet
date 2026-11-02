@@ -3,10 +3,10 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.conf import settings
 
-from otp.services import OTPService
-from otp.choices import OtpPurpose, OtpChannel
-from notifications.services import NotificationService
-from authentication.services import change_password, reset_password
+from apps.otp.services import OTPService
+from apps.otp.choices import OtpPurpose, OtpChannel
+from apps.notifications.services import NotificationService
+from apps.authentication.services import change_password, reset_password
 
 User = get_user_model()
 
@@ -71,7 +71,7 @@ class TestOTPServiceUnit:
         # Now even the correct OTP is rejected due to brute-force lockout
         assert OTPService.verify(user=identifier, purpose=OtpPurpose.REGISTRATION, submitted_otp=valid_otp) is False
 
-    @patch("emails.tasks.send_email_task.delay")
+    @patch("apps.emails.tasks.send_email_task.delay")
     def test_otp_send_dispatches_email_task_with_masked_body(self, mock_delay, fake_redis_client):
         identifier = "send_test@example.com"
         OTPService.send(user=identifier, purpose=OtpPurpose.REGISTRATION, channel=OtpChannel.EMAIL)

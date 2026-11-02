@@ -8,15 +8,15 @@ from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
 from rest_framework.views import APIView
 
-from authentication.models import Role
-from authentication.roles import SystemRole
-from authentication.services.permissions import (
+from apps.authentication.models import Role
+from apps.authentication.roles import SystemRole
+from apps.authentication.services.permissions import (
     assign_permission_to_role,
     assign_role,
 )
-from core.utils.decorators import authorize
-from core.utils.permissions import AuthorizePermission, HasPermission, HasRole
-from core.utils.response import success_response
+from apps.core.utils.decorators import authorize
+from apps.core.utils.permissions import AuthorizePermission, HasPermission, HasRole
+from apps.core.utils.response import success_response
 
 User = get_user_model()
 

@@ -2,8 +2,8 @@ import pytest
 from rest_framework import status
 from django.contrib.auth import get_user_model
 
-from otp.services import OTPService
-from otp.choices import OtpPurpose
+from apps.otp.services import OTPService
+from apps.otp.choices import OtpPurpose
 
 User = get_user_model()
 

@@ -15,10 +15,10 @@ Every response from this API — whether returned manually from a view or genera
 
 ## Table of Contents
 
-- [core/utils/response.py](#coreutilsresponsepy)
+- [apps/core/utils/response.py](#coreutilsresponsepy)
   - [success_response](#success_response)
   - [error_response](#error_response)
-- [core/utils/exception_handler.py](#coreutilsexception_handlerpy)
+- [apps/core/utils/exception_handler.py](#coreutilsexception_handlerpy)
   - [custom_exception_handler](#custom_exception_handler)
   - [handle_404](#handle_404)
   - [handle_500](#handle_500)
@@ -28,7 +28,7 @@ Every response from this API — whether returned manually from a view or genera
 
 ---
 
-## `core/utils/response.py - (Manual responses)`
+## `apps/core/utils/response.py - (Manual responses)`
 
 ### `success_response`
 
@@ -97,7 +97,7 @@ except Exception as e:
 
 ---
 
-## `core/utils/exception_handler.py - (Rise Exceptions Handling Process)`
+## `apps/core/utils/exception_handler.py - (Rise Exceptions Handling Process)`
 
 ### `custom_exception_handler`
 

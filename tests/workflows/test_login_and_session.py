@@ -53,7 +53,7 @@ class TestLoginAndSessionLifecycleWorkflow:
         assert logout_resp.data["success"] is True
 
         # Verify active user sessions are terminated
-        from activity.models import UserSession
+        from apps.activity.models import UserSession
         assert UserSession.objects.filter(user=test_user, is_active=True).count() == 0
 
         # 6. Verify blacklisted token is rejected

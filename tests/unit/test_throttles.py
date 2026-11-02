@@ -3,9 +3,9 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 
-from core.throttles import AuthenticatedUserRateThrottle, TargetIdentifierRateThrottle
-from authentication.throttles import LoginTargetThrottle, ResetPasswordTargetThrottle
-from otp.throttles import OtpTargetRateThrottle
+from apps.core.throttles import AuthenticatedUserRateThrottle, TargetIdentifierRateThrottle
+from apps.authentication.throttles import LoginTargetThrottle, ResetPasswordTargetThrottle
+from apps.otp.throttles import OtpTargetRateThrottle
 
 User = get_user_model()
 

@@ -18,7 +18,7 @@ from .configs.celery_schedules import CELERY_BEAT_SCHEDULE
 # =========================================
 AUTH_USER_MODEL = 'authentication.User'
 AUTHENTICATION_BACKENDS = [
-    'authentication.backends.RolePermissionBackend',
+    'apps.authentication.backends.RolePermissionBackend',
 ]
 
 
@@ -118,13 +118,13 @@ INSTALLED_APPS = [
     "corsheaders",
 
     # Self Define
-    'authentication',
-    'core',
-    'emails',
-    'otp',
-    'logs',
-    'activity',
-    'notifications',
+    'apps.authentication',
+    'apps.core',
+    'apps.emails',
+    'apps.otp',
+    'apps.logs',
+    'apps.activity',
+    'apps.notifications',
 ]
 
 MIDDLEWARE = [
@@ -136,8 +136,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'logs.middleware.LoggingContextMiddleware',
-    'activity.middleware.ActivityTrackingMiddleware',  # AFTER logs middleware — reads request.request_id
+    'apps.logs.middleware.LoggingContextMiddleware',
+    'apps.activity.middleware.ActivityTrackingMiddleware',  # AFTER logs middleware — reads request.request_id
 ]
 
 # =========================================
@@ -181,7 +181,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     "NUM_PROXIES": NUM_PROXIES,
-    "EXCEPTION_HANDLER": "core.utils.exception_handler.custom_exception_handler",
+    "EXCEPTION_HANDLER": "apps.core.utils.exception_handler.custom_exception_handler",
 }
 
 
@@ -333,5 +333,5 @@ SIMPLE_JWT = {
 }
 
 
-from logs.logging_config import get_logging_config
+from apps.logs.logging_config import get_logging_config
 LOGGING = get_logging_config(service_name="my_backend")

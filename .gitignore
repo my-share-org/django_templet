@@ -62,7 +62,7 @@ celerybeat-schedule.db
 
 
 # ======= Logs =======
-logs/logs_output/*
+apps/logs/logs_output/*
 
 # ======= Developer Files (internal only) =======
 developers_files/

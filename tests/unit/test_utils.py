@@ -8,12 +8,12 @@ from django.test import RequestFactory
 from rest_framework import status
 from rest_framework.exceptions import ValidationError as DRFValidationError, NotAuthenticated, PermissionDenied
 
-from core.utils.response import success_response, error_response
-from core.utils.exception_handler import custom_exception_handler, handle_404, handle_500
-from core.utils.general import get_or_400, get_client_ip
-from core.utils.image import process_image, ImageConfig
-from core.utils.generators import random_string
-from core.utils.app_model_relate import ModelInspector
+from apps.core.utils.response import success_response, error_response
+from apps.core.utils.exception_handler import custom_exception_handler, handle_404, handle_500
+from apps.core.utils.general import get_or_400, get_client_ip
+from apps.core.utils.image import process_image, ImageConfig
+from apps.core.utils.generators import random_string
+from apps.core.utils.app_model_relate import ModelInspector
 
 
 @pytest.mark.unit
@@ -192,7 +192,7 @@ class TestModelInspectorUnit:
         assert "Notification" in names
 
     def test_get_model_fields(self):
-        from notifications.models import Notification
+        from apps.notifications.models import Notification
         inspector = ModelInspector()
         fields = inspector.get_model_fields(Notification)
         field_names = {f.name for f in fields}

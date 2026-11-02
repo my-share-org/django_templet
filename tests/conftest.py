@@ -5,7 +5,7 @@ from django.core.cache import cache
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from notifications.models import Notification
+from apps.notifications.models import Notification
 
 User = get_user_model()
 
@@ -141,8 +141,8 @@ def fake_redis_client():
     require a live Redis server running on the machine.
     """
     fake_client = FakeRedisClient()
-    with patch("core.cache.redis_client.redis_client", fake_client), \
-         patch("otp.services.otp.redis_client", fake_client):
+    with patch("apps.core.cache.redis_client.redis_client", fake_client), \
+         patch("apps.otp.services.otp.redis_client", fake_client):
         yield fake_client
 
 
@@ -230,7 +230,7 @@ def staff_client(api_client, staff_user):
 @pytest.fixture
 def mock_send_email():
     """Mocks asynchronous email Celery task dispatch."""
-    with patch("emails.tasks.send_email_task.delay") as mock_delay:
+    with patch("apps.emails.tasks.send_email_task.delay") as mock_delay:
         yield mock_delay
 
 

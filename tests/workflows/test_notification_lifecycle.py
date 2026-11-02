@@ -1,7 +1,7 @@
 import pytest
 from rest_framework import status
-from notifications.models import Notification
-from notifications.services import NotificationService
+from apps.notifications.models import Notification
+from apps.notifications.services import NotificationService
 
 
 @pytest.mark.workflow

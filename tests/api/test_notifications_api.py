@@ -1,7 +1,7 @@
 import pytest
 from rest_framework import status
 
-from notifications.models import Notification
+from apps.notifications.models import Notification
 
 
 @pytest.mark.api

@@ -1,10 +1,10 @@
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
-from core.views import HealthCheckView, HealthReportView
+from apps.core.views import HealthCheckView, HealthReportView
 
-handler404 = "core.utils.exception_handler.handle_404"
-handler500 = "core.utils.exception_handler.handle_500"
+handler404 = "apps.core.utils.exception_handler.handle_404"
+handler500 = "apps.core.utils.exception_handler.handle_500"
 
 urlpatterns = [
     path("health/", HealthCheckView.as_view(), name="health_check"),

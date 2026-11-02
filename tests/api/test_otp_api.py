@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch
 from rest_framework import status
 
-from otp.choices import OtpPurpose, OtpChannel
+from apps.otp.choices import OtpPurpose, OtpChannel
 
 GET_OTP_URL = "/v1/otp/get-otp/"
 

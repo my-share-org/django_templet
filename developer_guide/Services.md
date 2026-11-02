@@ -9,10 +9,10 @@
   - [services/permissions.py](#servicespermissionspy)
   - [services/roles.py](#servicesrolespy)
 - [otp](#otp)
-  - [services/otp.py](#servicesotppy)
+  - [services/apps.otp.py](#servicesotppy)
   - [services/rules.py](#servicesrulespy)
 - [emails](#emails)
-  - [services/otp.py](#emailsservicesotppy)
+  - [services/apps.otp.py](#emailsservicesotppy)
 - [core](#core)
   - [services/health_check.py](#serviceshealthcheckpy)
 
@@ -94,14 +94,14 @@ Call only after OTP verification is confirmed. Never expose directly without OTP
 #### `sync_system_roles(prune=False, dry_run=False, role_definitions=None)`
 **Takes:** optional `prune` boolean, `dry_run` boolean, custom `role_definitions` list  
 **Returns:** dict summary: `{"created": [...], "updated": [...], "unchanged": [...], "pruned": [...], "protected_from_prune": [...]}`  
-**Rules:** Synchronizes database roles with `authentication.system_roles.SYSTEM_ROLES`. If `prune=True`, roles with active assigned users are safely soft-deleted rather than hard-deleted.
+**Rules:** Synchronizes database roles with `apps.authentication.system_roles.SYSTEM_ROLES`. If `prune=True`, roles with active assigned users are safely soft-deleted rather than hard-deleted.
 
 
 ---
 
 ## otp
 
-### `services/otp.py`
+### `services/apps.otp.py`
 
 #### `OTPService.generate(user, purpose)`
 **Takes:** user identifier string (email or phone), `OtpPurpose` value  
@@ -149,7 +149,7 @@ Check these fields before processing any OTP request:
 
 ## emails
 
-### `emails/services/otp.py`
+### `apps/emails/services/apps.otp.py`
 
 #### `send_otp_email(email, otp, otp_purpose)`
 **Takes:** recipient email string, plaintext OTP string, `OtpPurpose` value  

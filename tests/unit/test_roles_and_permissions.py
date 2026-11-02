@@ -5,9 +5,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
-from authentication.models import Role, UserRole
-from authentication.roles import SystemRole
-from authentication.services.permissions import (
+from apps.authentication.models import Role, UserRole
+from apps.authentication.roles import SystemRole
+from apps.authentication.services.permissions import (
     assign_group_to_role,
     assign_permission_to_role,
     assign_role,
@@ -24,7 +24,7 @@ from authentication.services.permissions import (
     remove_permission_from_role,
     remove_role,
 )
-from core.utils.permissions import check_object_permission
+from apps.core.utils.permissions import check_object_permission
 
 User = get_user_model()
 
@@ -365,8 +365,8 @@ class TestObjectLevelAuthorization:
 @pytest.mark.django_db
 class TestSystemRolesSync:
     def test_sync_system_roles_creates_new_roles(self):
-        from authentication.services.roles import sync_system_roles
-        from authentication.system_roles import RoleDefinition
+        from apps.authentication.services.roles import sync_system_roles
+        from apps.authentication.system_roles import RoleDefinition
 
         custom_def = [
             RoleDefinition(code="AUDITOR", name="Compliance Auditor", description="Audit logs access.")
@@ -379,8 +379,8 @@ class TestSystemRolesSync:
         assert role.is_system is True
 
     def test_sync_system_roles_updates_existing_role(self):
-        from authentication.services.roles import sync_system_roles
-        from authentication.system_roles import RoleDefinition
+        from apps.authentication.services.roles import sync_system_roles
+        from apps.authentication.system_roles import RoleDefinition
 
         Role.objects.create(code="ANALYST", name="Old Name", description="Old Desc", is_system=True)
 
@@ -395,8 +395,8 @@ class TestSystemRolesSync:
         assert role.description == "Updated description."
 
     def test_sync_system_roles_dry_run_leaves_db_unchanged(self):
-        from authentication.services.roles import sync_system_roles
-        from authentication.system_roles import RoleDefinition
+        from apps.authentication.services.roles import sync_system_roles
+        from apps.authentication.system_roles import RoleDefinition
 
         custom_def = [
             RoleDefinition(code="GHOST_ROLE", name="Ghost", description="Should not be created.")
@@ -406,8 +406,8 @@ class TestSystemRolesSync:
         assert not Role.objects.filter(code="GHOST_ROLE").exists()
 
     def test_sync_system_roles_prune_safety_with_active_user(self, test_user):
-        from authentication.services.roles import sync_system_roles
-        from authentication.system_roles import RoleDefinition
+        from apps.authentication.services.roles import sync_system_roles
+        from apps.authentication.system_roles import RoleDefinition
 
         # Role exists in DB with an assigned user, but is omitted from definitions
         obsolete_role = Role.objects.create(
@@ -442,8 +442,8 @@ class TestRoleAdminProtection:
     def test_admin_has_delete_permission_blocks_system_roles(self, superuser):
         from django.contrib.admin.sites import AdminSite
         from django.test import RequestFactory
-        from authentication.admin import RoleAdmin
-        from authentication.models import Role
+        from apps.authentication.admin import RoleAdmin
+        from apps.authentication.models import Role
 
         admin_site = AdminSite()
         role_admin = RoleAdmin(Role, admin_site)
@@ -461,8 +461,8 @@ class TestRoleAdminProtection:
     def test_admin_delete_queryset_skips_system_roles(self):
         from django.contrib.admin.sites import AdminSite
         from django.test import RequestFactory
-        from authentication.admin import RoleAdmin
-        from authentication.models import Role
+        from apps.authentication.admin import RoleAdmin
+        from apps.authentication.models import Role
 
         admin_site = AdminSite()
         role_admin = RoleAdmin(Role, admin_site)
